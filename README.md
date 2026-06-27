@@ -1,6 +1,6 @@
 # MongoDB Backup & Disaster Recovery
 
-A Node.js project implementing a complete MongoDB Atlas backup and disaster recovery pipeline, built and tested during an internship at Temflo Systems (June 2026).
+A Node.js project implementing a complete MongoDB Atlas backup and disaster recovery pipeline.
 
 ---
 
