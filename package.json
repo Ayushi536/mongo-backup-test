@@ -1,0 +1,22 @@
+{
+  "name": "mongo-backup-test",
+  "version": "1.0.0",
+  "description": "MongoDB Atlas backup and disaster recovery pipeline — Temflo Systems internship project",
+  "main": "pipeline.js",
+  "scripts": {
+    "backup": "node backup-full.js",
+    "backup:incremental": "node backup-incremental.js",
+    "restore": "node restore.js",
+    "pipeline": "node pipeline.js",
+    "watch": "node change-streams.js",
+    "verify": "node verify-replica-set.js",
+    "seed": "node insert-data.js"
+  },
+  "keywords": [],
+  "author": "Ayushi Sharma",
+  "license": "ISC",
+  "dependencies": {
+    "dotenv": "^16.0.0",
+    "mongodb": "^7.3.0"
+  }
+}
