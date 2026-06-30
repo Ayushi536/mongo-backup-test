@@ -36,6 +36,9 @@ const DB_NAME = "testDB";
 const S3_BUCKET = process.env.S3_BUCKET_NAME;
 const AWS_REGION = process.env.AWS_REGION || "ap-south-1";
 const HEARTBEAT_FILE = path.join(__dirname, "heartbeat.json");
+// Uploaded to S3 too — watchdog.js lives in a separate repo/machine, so it
+// can't read this local file. It reads this S3 key instead.
+const HEARTBEAT_S3_KEY = "heartbeats/backup-s3-heartbeat.json";
 
 if (!CONNECTION_STRING) {
   console.error("[ERROR] MONGO_URI not set. Add it to your .env file.");
@@ -91,13 +94,33 @@ async function uploadDirToS3(localDir, s3Prefix) {
 
 // ── Step 3: heartbeat — proof that this script ran successfully ──
 
-function writeHeartbeat(status, extra = {}) {
+async function writeHeartbeat(status, extra = {}) {
   const heartbeat = {
     lastRunAt: new Date().toISOString(),
     status, // "success" | "failed"
     ...extra,
   };
+
+  // Local copy — quick debugging on the machine this script runs on.
   fs.writeFileSync(HEARTBEAT_FILE, JSON.stringify(heartbeat, null, 2));
+
+  // S3 copy — this is the one that actually matters. watchdog.js (separate
+  // repo, possibly a different machine entirely) reads THIS to figure out
+  // if the backup script has stopped firing on schedule.
+  try {
+    await s3.send(
+      new PutObjectCommand({
+        Bucket: S3_BUCKET,
+        Key: HEARTBEAT_S3_KEY,
+        Body: JSON.stringify(heartbeat, null, 2),
+        ContentType: "application/json",
+      })
+    );
+    console.log(`[INFO] Heartbeat uploaded -> s3://${S3_BUCKET}/${HEARTBEAT_S3_KEY}`);
+  } catch (err) {
+    // Don't let a heartbeat upload failure crash/mask the backup result itself.
+    console.error("[WARN] Failed to upload heartbeat to S3:", err.message);
+  }
 }
 
 // ── MAIN ─────────────────────────────────────────────────────
@@ -113,11 +136,11 @@ async function main() {
 
     await uploadDirToS3(outputDir, s3Prefix);
 
-    writeHeartbeat("success", { s3Prefix });
+    await writeHeartbeat("success", { s3Prefix });
     console.log("\n[SUCCESS] Backup uploaded to S3 and heartbeat updated.");
   } catch (err) {
     console.error("[ERROR] backup-s3.js failed:", err.message);
-    writeHeartbeat("failed", { error: err.message });
+    await writeHeartbeat("failed", { error: err.message });
 
     // This script itself failing/crashing -> raise an incident immediately.
     // (Separate watchdog-style check for "script didn't run at all" lives
